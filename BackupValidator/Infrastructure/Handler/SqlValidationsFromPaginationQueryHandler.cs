@@ -21,21 +21,19 @@ public class SqlValidationsFromPaginationQueryHandler : IValidationsFromPaginati
                        """;
 
         await using var connection = new SqlConnection(query.ConnectionString);
-        using var shaHashing = SHA256.Create();
+
+        var result = await connection.QueryAsync<dynamic>(dbQuery, new
         {
-        
-            var result = await connection.QueryAsync<dynamic>(dbQuery, new
-            {
-                skipCount = query.SkipCount,
-                takeCount = query.TakeCount
-            });
-            
-            return result.Select(row => new RowValidation()
-            {
-                EntryPoint = query.EntryPoint,
-                Id = (row as IDictionary<string, object>)![query.IdProperty].ToString()!,
-                Hash = Encoding.Default.GetString(_hashAlgorithm.ComputeHash((byte[])JsonSerializer.SerializeToUtf8Bytes(row)))
-            });
-        }
+            skipCount = query.SkipCount,
+            takeCount = query.TakeCount
+        });
+
+        return result.Select(row => new RowValidation()
+        {
+            EntryPoint = query.EntryPoint,
+            Id = (row as IDictionary<string, object>)![query.IdProperty].ToString()!,
+            Hash = Encoding.Default.GetString(
+                _hashAlgorithm.ComputeHash((byte[])JsonSerializer.SerializeToUtf8Bytes(row)))
+        });
     }
 }
