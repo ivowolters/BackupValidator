@@ -33,7 +33,7 @@ public class SqlValidationsFromPaginationQueryHandler : IValidationsFromPaginati
             return result.Select(row => new RowValidation()
             {
                 EntryPoint = query.EntryPoint,
-                Id = (row as IDictionary<string, object>)!["Id"].ToString()!,
+                Id = (row as IDictionary<string, object>)![query.IdProperty].ToString()!,
                 Hash = Encoding.Default.GetString(_hashAlgorithm.ComputeHash((byte[])JsonSerializer.SerializeToUtf8Bytes(row)))
             });
         }
