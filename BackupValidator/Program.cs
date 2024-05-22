@@ -4,6 +4,8 @@ using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using BackupValidator.Infrastructure.Handler;
+using BackupValidator.Infrastructure.Query;
 using BackupValidator.Models;
 using Dapper;
 using Microsoft.Data.SqlClient;
@@ -17,21 +19,28 @@ var stopWatch = new Stopwatch();
 stopWatch.Start();
 
 // Creating validations
-using (SHA256 shaHashing = SHA256.Create())
-{
-    var query = "SELECT * FROM TestTable";
-    var result = connection.Query<dynamic>(query);
 
-    foreach (var row in result)
+IValidationsFromPaginationQueryHandler handler = new SqlValidationsFromPaginationQueryHandler();
+
+int currentTakeCount = 0;
+int page = 0;
+int take = 1000;
+
+do
+{
+    var result = (await handler.Handle(new ValidationsFromPaginationQuery()
     {
-        validations.Add(new RowValidation()
-        {
-            EntryPoint = "TestTable",
-            Id = (row as IDictionary<string, object>)!["Id"].ToString()!,
-            Hash = Encoding.Default.GetString(shaHashing.ComputeHash(JsonSerializer.SerializeToUtf8Bytes(row)))
-        });
-    }
-}
+        ConnectionString = connectionString,
+        EntryPoint = "TestTable",
+        IdProperty = "Id",
+        SkipCount = page * take,
+        TakeCount = take
+    })).ToList();
+    validations.AddRange(result);
+    currentTakeCount = result.Count();
+    page++;
+} while (currentTakeCount > 0);
+
 Console.WriteLine(stopWatch.Elapsed);
 
 
