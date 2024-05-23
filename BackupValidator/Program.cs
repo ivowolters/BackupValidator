@@ -20,7 +20,8 @@ stopWatch.Start();
 
 // Creating validations
 
-IValidationsFromPaginationQueryHandler handler = new SqlValidationsFromPaginationQueryHandler();
+IValidationsFromPaginationQueryHandler validationsFromPaginationQueryHandler = new SqlValidationsFromPaginationQueryHandler();
+ITableHasingFromIdRangeQueryHandler hasingFromIdRangeQueryHandler = new SqlTableHasingFromIdRangeQueryHandler();
 
 int currentTakeCount = 0;
 int page = 0;
@@ -28,7 +29,7 @@ int take = 1000;
 
 do
 {
-    var result = (await handler.Handle(new ValidationsFromPaginationQuery()
+    var result = (await validationsFromPaginationQueryHandler.Handle(new ValidationsFromPaginationQuery()
     {
         ConnectionString = connectionString,
         EntryPoint = "TestTable",
@@ -41,9 +42,6 @@ do
     page++;
 } while (currentTakeCount > 0);
 
-Console.WriteLine(stopWatch.Elapsed);
-
-
 // Validating db
 using (SHA256 shaHashing = SHA256.Create())
 {
@@ -52,14 +50,21 @@ using (SHA256 shaHashing = SHA256.Create())
 
     foreach (var chunk in chunks)
     {
-        var result = connection.Query(query, new { ids = chunk.Select(validation => validation.Id) });
+        var result = hasingFromIdRangeQueryHandler.Handle(new ValidationsFromIdRangeQuery()
+        {
+            ConnectionString = connectionString,
+            EntryPoint = "TestTable",
+            IdProperty = "Id",
+            IdRange = chunk.Select(x => x.Id).ToArray()
+        }).Result.ToList();
+        
         var resultMapping = new Dictionary<string, string>();
 
         foreach (var row in result)
         {
             resultMapping.Add(
-                (row as IDictionary<string, object>)!["Id"].ToString(),
-                Encoding.Default.GetString(shaHashing.ComputeHash(JsonSerializer.SerializeToUtf8Bytes(row)))
+                row.Id,
+                row.Hash
             );
         }
 
