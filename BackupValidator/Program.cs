@@ -2,6 +2,7 @@
 
 using System.Diagnostics;
 using System.Text.Json;
+using BackupValidator;
 using BackupValidator.Infrastructure.Handler;
 using BackupValidator.Infrastructure.Query;
 using BackupValidator.Models;
@@ -37,28 +38,25 @@ do
     page++;
 } while (currentTakeCount > 0);
 
+validations.Add(new RowValidation()
+{
+    EntryPoint = "TestTable",
+    Hash = "123",
+    Id = "5"
+});
+
 // Validating db
 var chunks = validations.Chunk(1000);
 
 foreach (var chunk in chunks)
 {
-    var result = hasingFromIdRangeQueryHandler.Handle(new ValidationsFromIdRangeQuery()
+    var resultMapping = (await hasingFromIdRangeQueryHandler.Handle(new ValidationsFromIdRangeQuery()
     {
         ConnectionString = connectionString,
         EntryPoint = "TestTable",
         IdProperty = "Id",
         IdRange = chunk.Select(x => x.Id).ToArray()
-    }).Result.ToList();
-
-    var resultMapping = new Dictionary<string, string>();
-
-    foreach (var row in result)
-    {
-        resultMapping.Add(
-            row.Id,
-            row.Hash
-        );
-    }
+    })).ToDictionary(row => row.Id, row => row.Hash);
 
     foreach (var validation in chunk)
     {
