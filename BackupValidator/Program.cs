@@ -81,7 +81,7 @@ foreach (var chunk in chunks)
 }
 
 
-Console.WriteLine(JsonSerializer.Serialize(validationResult));
+Console.WriteLine($"Result: {JsonSerializer.Serialize(validationResult)}");
 
 stopWatch.Stop();
 
