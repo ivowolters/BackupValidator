@@ -1,26 +1,21 @@
 ﻿// See https://aka.ms/new-console-template for more information
 
 using System.Diagnostics;
-using System.Security.Cryptography;
-using System.Text;
 using System.Text.Json;
 using BackupValidator.Infrastructure.Handler;
 using BackupValidator.Infrastructure.Query;
 using BackupValidator.Models;
-using Dapper;
-using Microsoft.Data.SqlClient;
 
 var connectionString = "Server=localhost;Database=BackupDbTest;Trusted_Connection=True;TrustServerCertificate=True;";
 var validations = new List<RowValidation>();
 var validationResult = new ValidationResult();
-var connection = new SqlConnection(connectionString);
 
 var stopWatch = new Stopwatch();
 stopWatch.Start();
 
 // Creating validations
-
-IValidationsFromPaginationQueryHandler validationsFromPaginationQueryHandler = new SqlValidationsFromPaginationQueryHandler();
+IValidationsFromPaginationQueryHandler validationsFromPaginationQueryHandler =
+    new SqlValidationsFromPaginationQueryHandler();
 ITableHasingFromIdRangeQueryHandler hasingFromIdRangeQueryHandler = new SqlTableHasingFromIdRangeQueryHandler();
 
 int currentTakeCount = 0;
@@ -43,53 +38,49 @@ do
 } while (currentTakeCount > 0);
 
 // Validating db
-using (SHA256 shaHashing = SHA256.Create())
+var chunks = validations.Chunk(1000);
+
+foreach (var chunk in chunks)
 {
-    var chunks = validations.Chunk(1000);
-    var query = "SELECT * FROM TestTable WHERE Id IN @ids";
-
-    foreach (var chunk in chunks)
+    var result = hasingFromIdRangeQueryHandler.Handle(new ValidationsFromIdRangeQuery()
     {
-        var result = hasingFromIdRangeQueryHandler.Handle(new ValidationsFromIdRangeQuery()
-        {
-            ConnectionString = connectionString,
-            EntryPoint = "TestTable",
-            IdProperty = "Id",
-            IdRange = chunk.Select(x => x.Id).ToArray()
-        }).Result.ToList();
-        
-        var resultMapping = new Dictionary<string, string>();
+        ConnectionString = connectionString,
+        EntryPoint = "TestTable",
+        IdProperty = "Id",
+        IdRange = chunk.Select(x => x.Id).ToArray()
+    }).Result.ToList();
 
-        foreach (var row in result)
+    var resultMapping = new Dictionary<string, string>();
+
+    foreach (var row in result)
+    {
+        resultMapping.Add(
+            row.Id,
+            row.Hash
+        );
+    }
+
+    foreach (var validation in chunk)
+    {
+        validationResult.ValidatedRowCount++;
+        if (!resultMapping.ContainsKey(validation.Id))
         {
-            resultMapping.Add(
-                row.Id,
-                row.Hash
-            );
+            validationResult.Anomalies.Add(new Anomaly
+            {
+                Id = validation.Id,
+                Type = AnomalyType.Deleted
+            });
+            continue;
         }
 
-        foreach (var validation in chunk)
+        if (validation.Hash != resultMapping[validation.Id])
         {
-            validationResult.ValidatedRowCount++;
-            if (!resultMapping.ContainsKey(validation.Id))
+            validationResult.Anomalies.Add(new Anomaly()
             {
-                validationResult.Anomalies.Add(new Anomaly
-                {
-                    Id = validation.Id,
-                    Type = AnomalyType.Deleted
-                });
-                continue;
-            }
-
-            if (validation.Hash != resultMapping[validation.Id])
-            {
-                validationResult.Anomalies.Add(new Anomaly()
-                {
-                    Id = validation.Id,
-                    Type = AnomalyType.Modified
-                });
-                continue;
-            }
+                Id = validation.Id,
+                Type = AnomalyType.Modified
+            });
+            continue;
         }
     }
 }
