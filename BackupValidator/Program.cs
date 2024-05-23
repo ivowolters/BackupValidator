@@ -1,8 +1,5 @@
-﻿// See https://aka.ms/new-console-template for more information
-
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Text.Json;
-using BackupValidator;
 using BackupValidator.Infrastructure.Handler;
 using BackupValidator.Infrastructure.Query;
 using BackupValidator.Models;
